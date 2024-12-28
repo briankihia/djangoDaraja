@@ -6,6 +6,9 @@ from .utils import initiate_payment
 import json
 from django.views.decorators.csrf import csrf_exempt
 import logging
+from .models import MpesaPayment
+from datetime import datetime
+from django.shortcuts import render
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -51,7 +54,20 @@ def payment_callback(request):
             logger.info(f"Transaction Date: {payment_data.get('TransactionDate')}")
             logger.info(f"Phone Number: {payment_data.get('PhoneNumber')}")
             
-            # Here you can add code to update your database with the payment details
+            # Save the transaction to database
+            MpesaPayment.objects.create(
+                amount=payment_data.get('Amount'),
+                receipt_number=payment_data.get('MpesaReceiptNumber'),
+                transaction_date=datetime.strptime(
+                    str(payment_data.get('TransactionDate')), 
+                    "%Y%m%d%H%M%S"
+                ),
+                phone_number=payment_data.get('PhoneNumber'),
+                merchant_request_id=merchant_request_id,
+                checkout_request_id=checkout_request_id,
+                result_code=result_code,
+                result_description=result_desc
+            )
             
         else:
             logger.error(f"Payment failed with ResultCode: {result_code}")
@@ -103,3 +119,9 @@ def initiate_mpesa_payment(request):
             'status': 'error',
             'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def transaction_list(request):
+    transactions = MpesaPayment.objects.all()
+    return render(request, 'mpesa/transaction_list.html', {
+        'transactions': transactions
+    })
